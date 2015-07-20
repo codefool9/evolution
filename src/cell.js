@@ -13,6 +13,14 @@ internal('cell', ['getAngle','getPointOnCircle'], function (getAngle, getPointOn
         setTargetPoint: function(point) {
             this.lastPoint = point;
         },
+        area: function() {
+            return Math.PI * this.radius * this.radius;
+        },
+        eat: function(c) {
+            var area = this.area() + c.area();
+            var r2 = area / Math.PI;
+            this.radius = Math.sqrt(r2);
+        },
         update: function() {
             var point = this.lastPoint;
             if (this.speed) {
@@ -27,7 +35,7 @@ internal('cell', ['getAngle','getPointOnCircle'], function (getAngle, getPointOn
             this.context.arc(this.x, this.y, this.radius, 0, 2 * Math.PI, false);
             this.context.fillStyle = this.color;
             this.context.fill();
-            this.context.lineWidth = 5;
+            this.context.lineWidth = 1;
             this.context.strokeStyle = '#003300';
             this.context.stroke();
         }

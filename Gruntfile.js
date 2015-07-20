@@ -23,7 +23,7 @@ module.exports = function(grunt) {
                 filename: 'evolution',
                 build: 'build',
                 scripts: {
-                    import: ['main'],
+                    import: ['main', 'http'],
                     src: ['src/**/*.js']
                 },
                 styles: {
