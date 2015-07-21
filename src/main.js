@@ -40,6 +40,7 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
             for (i = 0; i < max; i += 1) {
                 var c2 = cell.create(context, Math.random() * width, Math.random() * height, 10, 2, color);
                 c2.type = 'ai';
+                c2.name = 'Cp';
                 c2.id = performance.now();
                 shapes.push(c2);
                 AIPlayers.push(c2);
@@ -112,12 +113,17 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
             var str = '';
             if (c.score) {
                 for(var i  = 0; i < scores.length; i += 1) {
-                    if (!change && c.score > scores[i].score) {
+                    while (c === scores[i]) {
+                        scores.splice(i, 1);
+                    }
+                    if (scores[i] && c.score > scores[i].score) {
                         scores.splice(i, 0, c);
+                        i += 1;
                         change = true;
+                        break;
                     }
                 }
-                if (scores.length < 10) {
+                if (!change && scores.length < 10 && scores.indexOf(c) === -1) {
                     scores.push(c);
                     change = true;
                 }
@@ -125,10 +131,10 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
                     scores.length = 10;
                 }
                 if (change) {
-                    lbEl = document.getElementsByClassName('.leaders');
+                    lbEl = document.querySelector('.leaders');
                     if (lbEl) {
                         for(i = 0; i < scores.length; i += 1) {
-                            str += '<li><span class="leader-name">' + c.name + '</span> <span class="leader-score">' + c.score + '</span></li>\n';
+                            str += '<li><span class="leader-name">' + scores[i].name + '</span> <span class="leader-score">' + scores[i].score + '</span></li>\n';
                         }
                         lbEl.innerHTML = str;
                     }

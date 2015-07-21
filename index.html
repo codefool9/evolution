@@ -3,10 +3,20 @@
 <head lang="en">
     <meta charset="UTF-8">
     <title>Evolution</title>
+    <link rel="stylesheet" type="text/css" href="build/evolution.css">
 </head>
 <body>
-<canvas class="evolution" style="border:1px solid #000000;">
-</canvas>
+<div class="board">
+    <canvas class="evolution" style="border:1px solid #000000;">
+    </canvas>
+    <div class="leaderboard">
+        <div>Leader Board</div>
+        <ol class="leaders">
+
+        </ol>
+    </div>
+</div>
+
     <script src="build/peer.js"></script>
     <script src="build/p2p.js"></script>
     <script src="build/evolution.js"></script>
