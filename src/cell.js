@@ -8,6 +8,7 @@ internal('cell', ['getAngle','getPointOnCircle'], function (getAngle, getPointOn
         this.color = color || 'green';
         this.lastPoint = {x:x, y:y};
         this.status = 'alive';
+        this.score = 0;
     }
 
     Cell.prototype = {
@@ -18,10 +19,12 @@ internal('cell', ['getAngle','getPointOnCircle'], function (getAngle, getPointOn
             return Math.PI * this.radius * this.radius;
         },
         eat: function(c) {
+            var ca = c.area();
             var area = this.area() + c.area();
             var r2 = area / Math.PI;
             this.radius = Math.sqrt(r2);
             c.status = 'dead';
+            this.score += ca;
         },
         update: function() {
             var point = this.lastPoint;

@@ -155,6 +155,7 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
                         radius: player.radius,
                         color: player.color,
                         status: player.status,
+                        scoore: player.score,
                         lastUpdate: Date.now()
                     }]
                 };
