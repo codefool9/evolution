@@ -1,5 +1,5 @@
 internal('mouseControl', [], function () {
-    function MouseControl(target, cell) {
+    function MouseControl(target) {
         var self = this;
         self.x = 0;
         self.y = 0;
@@ -7,13 +7,12 @@ internal('mouseControl', [], function () {
         function onMouseMove(evt) {
             self.x = evt.offsetX;
             self.y = evt.offsetY;
-            cell.setTargetPoint(self);
         }
 
         target.addEventListener("mousemove", onMouseMove);
     }
 
-    return function createMouseControl(target, cell) {
-        return new MouseControl(target, cell);
+    return function createMouseControl(target) {
+        return new MouseControl(target);
     };
 });

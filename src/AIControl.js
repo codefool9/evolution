@@ -1,10 +1,8 @@
 internal('AIControl', ['getDistance'], function (getDistance) {
-    function AIControl(target, cell) {
+    function AIControl(cell, width, height) {
         var self = this;
         self.x = 0;
         self.y = 0;
-        var width = target.offsetWidth;
-        var height = target.offsetHeight;
 
         function makeNewPoint() {
             self.x = Math.random() * width;
@@ -22,7 +20,7 @@ internal('AIControl', ['getDistance'], function (getDistance) {
         setInterval(update, 20);
     }
 
-    return function createMouseControl(target, cell) {
-        return new AIControl(target, cell);
+    return function createMouseControl(cell, width, height) {
+        return new AIControl(cell, width, height);
     };
 });
