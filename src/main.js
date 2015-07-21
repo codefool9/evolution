@@ -12,6 +12,7 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
         canvas.width = viewWidth;
         canvas.height = viewHeight;
         var context = canvas.getContext("2d");
+        var scores = [];
 
         var level = 1;
         var AIPlayers = [];
@@ -85,6 +86,7 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
             for (i = 0; i < shapes.length; i += 1) {
                 c = shapes[i];
                 if (c.speed) {
+                    addToLeaders(c);
                     c.speed = (width / (c.radius * 0.5)) / 50;
                     collide = collision(c, shapes);
                     if (collide && collide.radius < c.radius) {
@@ -101,6 +103,36 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
                     }
                 }
                 c.draw(tl, br);
+            }
+        }
+
+        function addToLeaders(c) {
+            var change = false;
+            var lbEl;
+            var str = '';
+            if (c.score) {
+                for(var i  = 0; i < scores.length; i += 1) {
+                    if (!change && c.score > scores[i].score) {
+                        scores.splice(i, 0, c);
+                        change = true;
+                    }
+                }
+                if (scores.length < 10) {
+                    scores.push(c);
+                    change = true;
+                }
+                if (change && scores.length > 10) {
+                    scores.length = 10;
+                }
+                if (change) {
+                    lbEl = document.getElementsByClassName('.leaders');
+                    if (lbEl) {
+                        for(i = 0; i < scores.length; i += 1) {
+                            str += '<li><span class="leader-name">' + c.name + '</span> <span class="leader-score">' + c.score + '</span></li>\n';
+                        }
+                        lbEl.innerHTML = str;
+                    }
+                }
             }
         }
 

@@ -70,20 +70,29 @@
         });
         delete pending[name];
     };
-    //! src/collision.js
-    internal("collision", [ "getDistance" ], function(getDistance) {
-        function collision(cell, cells) {
-            var c;
-            var dist;
-            for (var i = 0; i < cells.length; i += 1) {
-                c = cells[i];
-                dist = getDistance(cell.x, cell.y, c.x, c.y);
-                if (cell !== c && dist < cell.radius + c.radius) {
-                    return c;
-                }
+    //! src/AIControl.js
+    internal("AIControl", [ "getDistance" ], function(getDistance) {
+        function AIControl(cell, width, height) {
+            var self = this;
+            self.x = 0;
+            self.y = 0;
+            function makeNewPoint() {
+                self.x = Math.random() * width;
+                self.y = Math.random() * height;
             }
+            function update(evt) {
+                var distance = getDistance(cell.x, cell.y, self.x, self.y);
+                if (distance < cell.speed) {
+                    makeNewPoint();
+                }
+                cell.setTargetPoint(self);
+            }
+            makeNewPoint();
+            setInterval(update, 20);
         }
-        return collision;
+        return function createMouseControl(cell, width, height) {
+            return new AIControl(cell, width, height);
+        };
     });
     //! src/main.js
     internal("main", [ "cell", "mouseControl", "AIControl", "collision" ], function(cell, mouseControl, AIControl, collision) {
@@ -98,6 +107,7 @@
         canvas.width = viewWidth;
         canvas.height = viewHeight;
         var context = canvas.getContext("2d");
+        var scores = [];
         var level = 1;
         var AIPlayers = [];
         var shapes = [];
@@ -169,6 +179,7 @@
             for (i = 0; i < shapes.length; i += 1) {
                 c = shapes[i];
                 if (c.speed) {
+                    addToLeaders(c);
                     c.speed = width / (c.radius * .5) / 50;
                     collide = collision(c, shapes);
                     if (collide && collide.radius < c.radius) {
@@ -184,6 +195,35 @@
                     }
                 }
                 c.draw(tl, br);
+            }
+        }
+        function addToLeaders(c) {
+            var change = false;
+            var lbEl;
+            var str = "";
+            if (c.score) {
+                for (var i = 0; i < scores.length; i += 1) {
+                    if (!change && c.score > scores[i].score) {
+                        scores.splice(i, 0, c);
+                        change = true;
+                    }
+                }
+                if (scores.length < 10) {
+                    scores.push(c);
+                    change = true;
+                }
+                if (change && scores.length > 10) {
+                    scores.length = 10;
+                }
+                if (change) {
+                    lbEl = document.getElementsByClassName(".leaders");
+                    if (lbEl) {
+                        for (i = 0; i < scores.length; i += 1) {
+                            str += '<li><span class="leader-name">' + c.name + '</span> <span class="leader-score">' + c.score + "</span></li>\n";
+                        }
+                        lbEl.innerHTML = str;
+                    }
+                }
             }
         }
         function handleLevelUp(collide) {
@@ -282,66 +322,25 @@
         createAIControls(level);
         connect();
     });
-    //! node_modules/hbjs/src/utils/geom/getAngle.js
-    define("getAngle", function() {
-        return function getAngle(x1, y1, x2, y2) {
-            return Math.atan2(y2 - y1, x2 - x1);
-        };
+    //! node_modules/hbjs/src/hb/utils/directive.js
+    internal("hb.directive", [ "hb.val" ], function(val) {
+        return val;
     });
-    //! node_modules/hbjs/src/utils/geom/getPointOnCircle.js
-    define("getPointOnCircle", function() {
-        return function getPointOnCircle(cx, cy, r, a) {
-            return {
-                x: cx + r * Math.cos(a),
-                y: cy + r * Math.sin(a)
-            };
-        };
-    });
-    //! src/mouseControl.js
-    internal("mouseControl", [], function() {
-        function MouseControl(target) {
-            var self = this;
-            self.x = 0;
-            self.y = 0;
-            function onMouseMove(evt) {
-                self.x = evt.offsetX;
-                self.y = evt.offsetY;
+    //! node_modules/hbjs/src/hb/utils/val.js
+    internal("hb.val", function() {
+        var cache = {};
+        var val = function(name, fn) {
+            if (typeof fn === "undefined") {
+                return cache[name];
             }
-            target.addEventListener("mousemove", onMouseMove);
-        }
-        return function createMouseControl(target) {
-            return new MouseControl(target);
+            cache[name] = fn;
         };
-    });
-    //! src/AIControl.js
-    internal("AIControl", [ "getDistance" ], function(getDistance) {
-        function AIControl(cell, width, height) {
-            var self = this;
-            self.x = 0;
-            self.y = 0;
-            function makeNewPoint() {
-                self.x = Math.random() * width;
-                self.y = Math.random() * height;
+        val.init = function(app) {
+            for (var name in cache) {
+                app.val(name, cache[name]);
             }
-            function update(evt) {
-                var distance = getDistance(cell.x, cell.y, self.x, self.y);
-                if (distance < cell.speed) {
-                    makeNewPoint();
-                }
-                cell.setTargetPoint(self);
-            }
-            makeNewPoint();
-            setInterval(update, 20);
-        }
-        return function createMouseControl(cell, width, height) {
-            return new AIControl(cell, width, height);
         };
-    });
-    //! node_modules/hbjs/src/utils/geom/getDistance.js
-    define("getDistance", function() {
-        return function getDistance(x1, y1, x2, y2) {
-            return Math.sqrt((x2 -= x1) * x2 + (y2 -= y1) * y2);
-        };
+        return val;
     });
     //! src/cell.js
     internal("cell", [ "getAngle", "getPointOnCircle" ], function(getAngle, getPointOnCircle) {
@@ -403,6 +402,111 @@
                 return new Cell(context, x, y, radius, speed, color);
             }
         };
+    });
+    //! node_modules/hbjs/src/utils/geom/getAngle.js
+    define("getAngle", function() {
+        return function getAngle(x1, y1, x2, y2) {
+            return Math.atan2(y2 - y1, x2 - x1);
+        };
+    });
+    //! node_modules/hbjs/src/utils/geom/getPointOnCircle.js
+    define("getPointOnCircle", function() {
+        return function getPointOnCircle(cx, cy, r, a) {
+            return {
+                x: cx + r * Math.cos(a),
+                y: cy + r * Math.sin(a)
+            };
+        };
+    });
+    //! src/mouseControl.js
+    internal("mouseControl", [], function() {
+        function MouseControl(target) {
+            var self = this;
+            self.x = 0;
+            self.y = 0;
+            function onMouseMove(evt) {
+                self.x = evt.offsetX;
+                self.y = evt.offsetY;
+            }
+            target.addEventListener("mousemove", onMouseMove);
+        }
+        return function createMouseControl(target) {
+            return new MouseControl(target);
+        };
+    });
+    //! node_modules/hbjs/src/hb/directives/attr/class.js
+    internal("hb.attr.class", [ "hb.directive" ], function(directive) {
+        directive("class", function() {
+            return {
+                link: [ "scope", "el", "$app", function(scope, el, $app) {
+                    var len = el.classList.length, bindClasses = [], watchId;
+                    for (var i = 0; i < len; i += 1) {
+                        if (el.classList[i].indexOf($app.bindingMarkup[0]) !== -1) {
+                            bindClasses.push({
+                                bindOnce: scope.$isBindOnce(el.classList[i]),
+                                bind: el.classList[i],
+                                last: ""
+                            });
+                            el.classList.remove(el.classList[i]);
+                            i -= 1;
+                            len -= 1;
+                        }
+                    }
+                    function classAttr() {
+                        this.expr = "class";
+                        var i, len = bindClasses.length, result, item;
+                        for (i = 0; i < len; i += 1) {
+                            item = bindClasses[i];
+                            result = $app.parseBinds(scope, item.bind);
+                            if (result !== item.last && item.last) {
+                                el.classList.remove(item.last);
+                            }
+                            if (result) {
+                                el.classList.add(result);
+                            }
+                            if (item.bindOnce) {
+                                bindClasses.splice(i, 1);
+                                i -= 1;
+                                if (!bindClasses.length) {
+                                    scope.$unwatch(watchId);
+                                }
+                            }
+                            item.last = result;
+                        }
+                    }
+                    if (bindClasses.length) {
+                        watchId = scope.$watch(classAttr);
+                    }
+                    scope.$on("$destroy", function() {
+                        bindClasses.length = 0;
+                        scope = null;
+                        el = null;
+                        $app = null;
+                    });
+                } ]
+            };
+        });
+    });
+    //! node_modules/hbjs/src/utils/geom/getDistance.js
+    define("getDistance", function() {
+        return function getDistance(x1, y1, x2, y2) {
+            return Math.sqrt((x2 -= x1) * x2 + (y2 -= y1) * y2);
+        };
+    });
+    //! src/collision.js
+    internal("collision", [ "getDistance" ], function(getDistance) {
+        function collision(cell, cells) {
+            var c;
+            var dist;
+            for (var i = 0; i < cells.length; i += 1) {
+                c = cells[i];
+                dist = getDistance(cell.x, cell.y, c.x, c.y);
+                if (cell !== c && dist < cell.radius + c.radius) {
+                    return c;
+                }
+            }
+        }
+        return collision;
     });
     //! node_modules/hbjs/src/utils/ajax/http.js
     define("http", [ "extend" ], function(extend) {
