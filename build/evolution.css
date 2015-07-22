@@ -5,8 +5,8 @@ body {
   margin: 0px;
 }
 .board {
-  position: relative;
-  width: auto;
+  position: block;
+  width: 800;
   display: inline-block;
 }
 .leaderboard {

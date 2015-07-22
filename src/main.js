@@ -1,23 +1,18 @@
 /*globals exports */
-internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
-    function (cell, mouseControl, AIControl, collision) {
+internal('main', ['cell', 'pellet', 'mouseControl', 'AIControl', 'collision', 'colors', 'leaders', 'getUID'],
+    function (cell, pellet, mouseControl, AIControl, collision, colors, leaders, getUID) {
         window.hb = exports;
-        var colors = ['#3F51B5', '#4CAF50', '#FF9800', '#f93b39', '#de9c1b', '#008bf5', '#708bca', '#87a5ae', '#ff6092'];
-        var color = randomColor();
+        var color = colors.color;
         var canvas = document.querySelector(".evolution");
         var width = 2000;
         var height = 2000;
-        var viewWidth = 800;
-        var viewHeight = 800;
+        var viewWidth = 1024;
+        var viewHeight = 768;
         canvas.width = viewWidth;
         canvas.height = viewHeight;
         var context = canvas.getContext("2d");
-        var scores = [];
-
         var level = 1;
         var AIPlayers = [];
-        //TODO: make all AI cells start away from the player to give starting room.
-        //difine area for player to start and AI cells cannot start in.
         var shapes = [];
         var i;
         var defaultSize = 7.5;
@@ -32,16 +27,12 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
             return Math.random() * height;
         }
 
-        function randomColor() {
-            return colors[Math.floor(Math.random() * colors.length)];
-        }
-
         function createAIControls(max) {
             for (i = 0; i < max; i += 1) {
                 var c2 = cell.create(context, Math.random() * width, Math.random() * height, 10, 2, color);
                 c2.type = 'ai';
                 c2.name = 'Cp';
-                c2.id = performance.now();
+                c2.id = getUID();
                 shapes.push(c2);
                 AIPlayers.push(c2);
                 AIControl(c2, width, height);
@@ -50,7 +41,7 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
 
         function createPellets(numOfPellets) {
             for (i = 0; i < numOfPellets; i += 1) {
-                var p1 = cell.create(context, randomX(), randomY(), Math.random() * 3 + 3);
+                var p1 = pellet.create(context, randomX(), randomY(), Math.random() * 3 + 3, '#F0F');
                 p1.type = 'pellet';
                 shapes.push(p1);
             }
@@ -87,8 +78,8 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
             for (i = 0; i < shapes.length; i += 1) {
                 c = shapes[i];
                 if (c.speed) {
-                    addToLeaders(c);
-                    c.speed = (width / (c.radius * 0.5)) / 50;
+                    leaders.add(c);
+                    c.speed = (width / (c.radius * 0.1)) / 100;
                     collide = collision(c, shapes);
                     if (collide && collide.radius < c.radius) {
                         c.eat(collide);
@@ -104,41 +95,6 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
                     }
                 }
                 c.draw(tl, br);
-            }
-        }
-
-        function addToLeaders(c) {
-            var change = false;
-            var lbEl;
-            var str = '';
-            if (c.score) {
-                for(var i  = 0; i < scores.length; i += 1) {
-                    while (c === scores[i]) {
-                        scores.splice(i, 1);
-                    }
-                    if (scores[i] && c.score > scores[i].score) {
-                        scores.splice(i, 0, c);
-                        i += 1;
-                        change = true;
-                        break;
-                    }
-                }
-                if (!change && scores.length < 10 && scores.indexOf(c) === -1) {
-                    scores.push(c);
-                    change = true;
-                }
-                if (change && scores.length > 10) {
-                    scores.length = 10;
-                }
-                if (change) {
-                    lbEl = document.querySelector('.leaders');
-                    if (lbEl) {
-                        for(i = 0; i < scores.length; i += 1) {
-                            str += '<li><span class="leader-name">' + scores[i].name + '</span> <span class="leader-score">' + scores[i].score + '</span></li>\n';
-                        }
-                        lbEl.innerHTML = str;
-                    }
-                }
             }
         }
 
@@ -167,7 +123,7 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
         }
 
         player = cell.create(context, 250, 250, defaultSize, 2, color);
-        player.id = Date.now();
+        player.id = getUID();
         player.name = prompt('Please enter your name');
         shapes.push(player);
         mouse = mouseControl(canvas);
@@ -177,6 +133,15 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
 
         function connect() {
             var p2p = new P2P('g5ezqak33ze3766r', 'evolution', player);
+            var cache = {};
+
+            function hasChanged(c) {
+                if (!c.alive) {
+                    return false;
+                }
+                var pc = cache[c.id];
+                return !!(!pc || pc.tx !== c.lastPoint.x || pc.ty !== c.lastPoint.y || pc.radius !== c.radius);
+            }
 
             function update() {
                 if (shapes.indexOf(player) === -1) {
@@ -184,7 +149,10 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
                 }
                 var aip;
                 var data = {
-                    shapes: [{
+                    shapes: []
+                };
+                if (hasChanged(player)) {
+                    data.shapes.push({
                         id: player.id.toString(),
                         x: player.x,
                         y: player.y,
@@ -192,24 +160,26 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
                         ty: player.lastPoint.y,
                         radius: player.radius,
                         color: player.color,
-                        status: player.status,
-                        scoore: player.score,
-                        lastUpdate: Date.now()
-                    }]
-                };
-                for (var i = 0; i < AIPlayers.length; i += 1) {
-                    aip = AIPlayers[i];
-                    data.shapes.push({
-                        id: aip.id.toString(),
-                        x: aip.x,
-                        y: aip.y,
-                        tx: aip.lastPoint.x,
-                        ty: aip.lastPoint.y,
-                        radius: aip.radius,
-                        color: aip.color,
-                        status: aip.status,
+                        alive: player.alive,
+                        score: player.score,
                         lastUpdate: Date.now()
                     });
+                }
+                for (var i = 0; i < AIPlayers.length; i += 1) {
+                    aip = AIPlayers[i];
+                    if (hasChanged(aip)) {
+                        data.shapes.push({
+                            id: aip.id.toString(),
+                            x: aip.x,
+                            y: aip.y,
+                            tx: aip.lastPoint.x,
+                            ty: aip.lastPoint.y,
+                            radius: aip.radius,
+                            color: aip.color,
+                            alive: aip.alive,
+                            lastUpdate: Date.now()
+                        });
+                    }
                 }
                 p2p.send(data);
 
@@ -220,13 +190,13 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
                 for(var i = 0; i < message.shapes.length; i += 1) {
                     var s = message.shapes[i];
                     var plr;
-                    if (s.status === 'dead') {
+                    if (!s.alive) {
                         return;
                     }
                     plr = findPlayer(s.id);
                     if (plr && s.lastUpdate < Date.now() - 1000) {
                         shapes.splice(shapes.indexOf(plr), 1);
-                        plr.status = 'dead';
+                        plr.alive = false;
                     }
                     if (!plr) {
                         plr = cell.create(context, s.x, s.y, defaultSize, 2, s.color);
@@ -246,9 +216,6 @@ internal('main', ['cell', 'mouseControl', 'AIControl', 'collision'],
             p2p.connect(update);
         }
 
-        //if (AIEnabled) {
-            createAIControls(level);
-        //} else {
-            connect();
-        //}
+        createAIControls(level);
+        connect();
     });

@@ -70,44 +70,65 @@
         });
         delete pending[name];
     };
-    //! src/AIControl.js
-    internal("AIControl", [ "getDistance" ], function(getDistance) {
-        function AIControl(cell, width, height) {
-            var self = this;
-            self.x = 0;
-            self.y = 0;
-            function makeNewPoint() {
-                self.x = Math.random() * width;
-                self.y = Math.random() * height;
-            }
-            function update(evt) {
-                var distance = getDistance(cell.x, cell.y, self.x, self.y);
-                if (distance < cell.speed) {
-                    makeNewPoint();
+    //! src/leaders.js
+    internal("leaders", function() {
+        function LeaderBoard() {
+            var scores = [];
+            var el = document.querySelector(".leaders");
+            function add(c) {
+                var change = false;
+                var str = "";
+                if (c.score) {
+                    for (var i = 0; i < scores.length; i += 1) {
+                        while (c === scores[i]) {
+                            scores.splice(i, 1);
+                        }
+                        if (scores[i] && scores[i].status === "alive" && c.score > scores[i].score) {
+                            scores.splice(i, 0, c);
+                            i += 1;
+                            change = true;
+                            break;
+                        }
+                    }
+                    if (!change && scores.length < 10 && scores.indexOf(c) === -1) {
+                        scores.push(c);
+                        change = true;
+                    }
+                    if (change && scores.length > 10) {
+                        scores.length = 10;
+                    }
+                    if (change) {
+                        if (el) {
+                            for (i = 0; i < scores.length; i += 1) {
+                                if (!scores[i].alive) {
+                                    scores.splice(i, 1);
+                                }
+                                if (scores[i]) {
+                                    str += '<li><span class="leader-name">' + scores[i].name + '</span> <span class="leader-score">' + Math.floor(scores[i].score) + "</span></li>\n";
+                                }
+                            }
+                            el.innerHTML = str;
+                        }
+                    }
                 }
-                cell.setTargetPoint(self);
             }
-            makeNewPoint();
-            setInterval(update, 20);
+            this.add = add;
+            this.scores = scores;
         }
-        return function createMouseControl(cell, width, height) {
-            return new AIControl(cell, width, height);
-        };
+        return new LeaderBoard();
     });
     //! src/main.js
-    internal("main", [ "cell", "mouseControl", "AIControl", "collision" ], function(cell, mouseControl, AIControl, collision) {
+    internal("main", [ "cell", "pellet", "mouseControl", "AIControl", "collision", "colors", "leaders", "getUID" ], function(cell, pellet, mouseControl, AIControl, collision, colors, leaders, getUID) {
         window.hb = exports;
-        var colors = [ "#3F51B5", "#4CAF50", "#FF9800", "#f93b39", "#de9c1b", "#008bf5", "#708bca", "#87a5ae", "#ff6092" ];
-        var color = randomColor();
+        var color = colors.color;
         var canvas = document.querySelector(".evolution");
         var width = 2e3;
         var height = 2e3;
-        var viewWidth = 800;
-        var viewHeight = 800;
+        var viewWidth = 1024;
+        var viewHeight = 768;
         canvas.width = viewWidth;
         canvas.height = viewHeight;
         var context = canvas.getContext("2d");
-        var scores = [];
         var level = 1;
         var AIPlayers = [];
         var shapes = [];
@@ -121,14 +142,12 @@
         function randomY() {
             return Math.random() * height;
         }
-        function randomColor() {
-            return colors[Math.floor(Math.random() * colors.length)];
-        }
         function createAIControls(max) {
             for (i = 0; i < max; i += 1) {
                 var c2 = cell.create(context, Math.random() * width, Math.random() * height, 10, 2, color);
                 c2.type = "ai";
-                c2.id = performance.now();
+                c2.name = "Cp";
+                c2.id = getUID();
                 shapes.push(c2);
                 AIPlayers.push(c2);
                 AIControl(c2, width, height);
@@ -136,7 +155,7 @@
         }
         function createPellets(numOfPellets) {
             for (i = 0; i < numOfPellets; i += 1) {
-                var p1 = cell.create(context, randomX(), randomY(), Math.random() * 3 + 3);
+                var p1 = pellet.create(context, randomX(), randomY(), Math.random() * 3 + 3, "#F0F");
                 p1.type = "pellet";
                 shapes.push(p1);
             }
@@ -179,8 +198,8 @@
             for (i = 0; i < shapes.length; i += 1) {
                 c = shapes[i];
                 if (c.speed) {
-                    addToLeaders(c);
-                    c.speed = width / (c.radius * .5) / 50;
+                    leaders.add(c);
+                    c.speed = width / (c.radius * .1) / 100;
                     collide = collision(c, shapes);
                     if (collide && collide.radius < c.radius) {
                         c.eat(collide);
@@ -195,35 +214,6 @@
                     }
                 }
                 c.draw(tl, br);
-            }
-        }
-        function addToLeaders(c) {
-            var change = false;
-            var lbEl;
-            var str = "";
-            if (c.score) {
-                for (var i = 0; i < scores.length; i += 1) {
-                    if (!change && c.score > scores[i].score) {
-                        scores.splice(i, 0, c);
-                        change = true;
-                    }
-                }
-                if (scores.length < 10) {
-                    scores.push(c);
-                    change = true;
-                }
-                if (change && scores.length > 10) {
-                    scores.length = 10;
-                }
-                if (change) {
-                    lbEl = document.getElementsByClassName(".leaders");
-                    if (lbEl) {
-                        for (i = 0; i < scores.length; i += 1) {
-                            str += '<li><span class="leader-name">' + c.name + '</span> <span class="leader-score">' + c.score + "</span></li>\n";
-                        }
-                        lbEl.innerHTML = str;
-                    }
-                }
             }
         }
         function handleLevelUp(collide) {
@@ -248,7 +238,7 @@
             }
         }
         player = cell.create(context, 250, 250, defaultSize, 2, color);
-        player.id = Date.now();
+        player.id = getUID();
         player.name = prompt("Please enter your name");
         shapes.push(player);
         mouse = mouseControl(canvas);
@@ -256,13 +246,24 @@
         createPellets(200);
         function connect() {
             var p2p = new P2P("g5ezqak33ze3766r", "evolution", player);
+            var cache = {};
+            function hasChanged(c) {
+                if (!c.alive) {
+                    return false;
+                }
+                var pc = cache[c.id];
+                return !!(!pc || pc.tx !== c.lastPoint.x || pc.ty !== c.lastPoint.y || pc.radius !== c.radius);
+            }
             function update() {
                 if (shapes.indexOf(player) === -1) {
                     return;
                 }
                 var aip;
                 var data = {
-                    shapes: [ {
+                    shapes: []
+                };
+                if (hasChanged(player)) {
+                    data.shapes.push({
                         id: player.id.toString(),
                         x: player.x,
                         y: player.y,
@@ -270,24 +271,26 @@
                         ty: player.lastPoint.y,
                         radius: player.radius,
                         color: player.color,
-                        status: player.status,
-                        scoore: player.score,
-                        lastUpdate: Date.now()
-                    } ]
-                };
-                for (var i = 0; i < AIPlayers.length; i += 1) {
-                    aip = AIPlayers[i];
-                    data.shapes.push({
-                        id: aip.id.toString(),
-                        x: aip.x,
-                        y: aip.y,
-                        tx: aip.lastPoint.x,
-                        ty: aip.lastPoint.y,
-                        radius: aip.radius,
-                        color: aip.color,
-                        status: aip.status,
+                        alive: player.alive,
+                        score: player.score,
                         lastUpdate: Date.now()
                     });
+                }
+                for (var i = 0; i < AIPlayers.length; i += 1) {
+                    aip = AIPlayers[i];
+                    if (hasChanged(aip)) {
+                        data.shapes.push({
+                            id: aip.id.toString(),
+                            x: aip.x,
+                            y: aip.y,
+                            tx: aip.lastPoint.x,
+                            ty: aip.lastPoint.y,
+                            radius: aip.radius,
+                            color: aip.color,
+                            alive: aip.alive,
+                            lastUpdate: Date.now()
+                        });
+                    }
                 }
                 p2p.send(data);
                 setTimeout(update, 100);
@@ -296,13 +299,13 @@
                 for (var i = 0; i < message.shapes.length; i += 1) {
                     var s = message.shapes[i];
                     var plr;
-                    if (s.status === "dead") {
+                    if (!s.alive) {
                         return;
                     }
                     plr = findPlayer(s.id);
                     if (plr && s.lastUpdate < Date.now() - 1e3) {
                         shapes.splice(shapes.indexOf(plr), 1);
-                        plr.status = "dead";
+                        plr.alive = false;
                     }
                     if (!plr) {
                         plr = cell.create(context, s.x, s.y, defaultSize, 2, s.color);
@@ -322,25 +325,128 @@
         createAIControls(level);
         connect();
     });
-    //! node_modules/hbjs/src/hb/utils/directive.js
-    internal("hb.directive", [ "hb.val" ], function(val) {
-        return val;
+    //! node_modules/hbjs/src/utils/geom/getAngle.js
+    define("getAngle", function() {
+        return function getAngle(x1, y1, x2, y2) {
+            return Math.atan2(y2 - y1, x2 - x1);
+        };
     });
-    //! node_modules/hbjs/src/hb/utils/val.js
-    internal("hb.val", function() {
-        var cache = {};
-        var val = function(name, fn) {
-            if (typeof fn === "undefined") {
-                return cache[name];
-            }
-            cache[name] = fn;
+    //! node_modules/hbjs/src/utils/geom/getPointOnCircle.js
+    define("getPointOnCircle", function() {
+        return function getPointOnCircle(cx, cy, r, a) {
+            return {
+                x: cx + r * Math.cos(a),
+                y: cy + r * Math.sin(a)
+            };
         };
-        val.init = function(app) {
-            for (var name in cache) {
-                app.val(name, cache[name]);
+    });
+    //! src/pellet.js
+    internal("pellet", function() {
+        function Pellet(context, x, y, radius, color) {
+            this.context = context;
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+            this.color = color;
+            this._area = Math.PI * radius * radius;
+        }
+        Pellet.prototype = {
+            update: function() {},
+            area: function() {
+                return this._area;
+            },
+            draw: function(tl, br) {
+                var x, y;
+                if (this.x > tl.x && this.x < br.x && this.y > tl.y && this.y < br.y) {
+                    x = this.x - tl.x;
+                    y = this.y - tl.y;
+                    this.context.beginPath();
+                    this.context.arc(x, y, this.radius, 0, 2 * Math.PI, false);
+                    this.context.fillStyle = this.color;
+                    this.context.fill();
+                    this.context.lineWidth = 1;
+                    this.context.strokeStyle = "#003300";
+                    this.context.stroke();
+                }
             }
         };
-        return val;
+        return {
+            create: function(context, x, y, radius, color) {
+                return new Pellet(context, x, y, radius, color);
+            }
+        };
+    });
+    //! src/mouseControl.js
+    internal("mouseControl", [], function() {
+        function MouseControl(target) {
+            var self = this;
+            self.x = 0;
+            self.y = 0;
+            function onMouseMove(evt) {
+                self.x = evt.offsetX;
+                self.y = evt.offsetY;
+            }
+            target.addEventListener("mousemove", onMouseMove);
+        }
+        return function createMouseControl(target) {
+            return new MouseControl(target);
+        };
+    });
+    //! src/AIControl.js
+    internal("AIControl", [ "getDistance" ], function(getDistance) {
+        function AIControl(cell, width, height) {
+            var self = this;
+            self.x = 0;
+            self.y = 0;
+            function makeNewPoint() {
+                self.x = Math.random() * width;
+                self.y = Math.random() * height;
+            }
+            function update(evt) {
+                var distance = getDistance(cell.x, cell.y, self.x, self.y);
+                if (distance < cell.speed) {
+                    makeNewPoint();
+                }
+                cell.setTargetPoint(self);
+            }
+            makeNewPoint();
+            setInterval(update, 20);
+        }
+        return function createMouseControl(cell, width, height) {
+            return new AIControl(cell, width, height);
+        };
+    });
+    //! node_modules/hbjs/src/utils/geom/getDistance.js
+    define("getDistance", function() {
+        return function getDistance(x1, y1, x2, y2) {
+            return Math.sqrt((x2 -= x1) * x2 + (y2 -= y1) * y2);
+        };
+    });
+    //! src/collision.js
+    internal("collision", [ "getDistance" ], function(getDistance) {
+        function collision(cell, cells) {
+            var c;
+            var dist;
+            for (var i = 0; i < cells.length; i += 1) {
+                c = cells[i];
+                dist = getDistance(cell.x, cell.y, c.x, c.y);
+                if (cell !== c && dist < cell.radius + c.radius) {
+                    return c;
+                }
+            }
+        }
+        return collision;
+    });
+    //! src/colors.js
+    internal("colors", function() {
+        var colors = [ "#3F51B5", "#4CAF50", "#FF9800", "#f93b39", "#de9c1b", "#008bf5", "#708bca", "#87a5ae", "#ff6092" ];
+        function randomColor() {
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+        return {
+            color: randomColor(),
+            randomColor: randomColor
+        };
     });
     //! src/cell.js
     internal("cell", [ "getAngle", "getPointOnCircle" ], function(getAngle, getPointOnCircle) {
@@ -355,7 +461,7 @@
                 x: x,
                 y: y
             };
-            this.status = "alive";
+            this.alive = true;
             this.score = 0;
         }
         Cell.prototype = {
@@ -370,7 +476,7 @@
                 var area = this.area() + c.area();
                 var r2 = area / Math.PI;
                 this.radius = Math.sqrt(r2);
-                c.status = "dead";
+                c.alive = false;
                 this.score += ca;
             },
             update: function() {
@@ -401,37 +507,6 @@
             create: function(context, x, y, radius, speed, color) {
                 return new Cell(context, x, y, radius, speed, color);
             }
-        };
-    });
-    //! node_modules/hbjs/src/utils/geom/getAngle.js
-    define("getAngle", function() {
-        return function getAngle(x1, y1, x2, y2) {
-            return Math.atan2(y2 - y1, x2 - x1);
-        };
-    });
-    //! node_modules/hbjs/src/utils/geom/getPointOnCircle.js
-    define("getPointOnCircle", function() {
-        return function getPointOnCircle(cx, cy, r, a) {
-            return {
-                x: cx + r * Math.cos(a),
-                y: cy + r * Math.sin(a)
-            };
-        };
-    });
-    //! src/mouseControl.js
-    internal("mouseControl", [], function() {
-        function MouseControl(target) {
-            var self = this;
-            self.x = 0;
-            self.y = 0;
-            function onMouseMove(evt) {
-                self.x = evt.offsetX;
-                self.y = evt.offsetY;
-            }
-            target.addEventListener("mousemove", onMouseMove);
-        }
-        return function createMouseControl(target) {
-            return new MouseControl(target);
         };
     });
     //! node_modules/hbjs/src/hb/directives/attr/class.js
@@ -487,26 +562,35 @@
             };
         });
     });
-    //! node_modules/hbjs/src/utils/geom/getDistance.js
-    define("getDistance", function() {
-        return function getDistance(x1, y1, x2, y2) {
-            return Math.sqrt((x2 -= x1) * x2 + (y2 -= y1) * y2);
-        };
+    //! node_modules/hbjs/src/hb/utils/directive.js
+    internal("hb.directive", [ "hb.val" ], function(val) {
+        return val;
     });
-    //! src/collision.js
-    internal("collision", [ "getDistance" ], function(getDistance) {
-        function collision(cell, cells) {
-            var c;
-            var dist;
-            for (var i = 0; i < cells.length; i += 1) {
-                c = cells[i];
-                dist = getDistance(cell.x, cell.y, c.x, c.y);
-                if (cell !== c && dist < cell.radius + c.radius) {
-                    return c;
-                }
+    //! node_modules/hbjs/src/hb/utils/val.js
+    internal("hb.val", function() {
+        var cache = {};
+        var val = function(name, fn) {
+            if (typeof fn === "undefined") {
+                return cache[name];
             }
+            cache[name] = fn;
+        };
+        val.init = function(app) {
+            for (var name in cache) {
+                app.val(name, cache[name]);
+            }
+        };
+        return val;
+    });
+    //! src/getUID.js
+    internal("getUID", function() {
+        function guid() {
+            function s4() {
+                return Math.floor((1 + Math.random()) * 65536).toString(16).substring(1);
+            }
+            return s4() + s4() + "-" + s4() + "-" + s4() + "-" + s4() + "-" + s4() + s4() + s4();
         }
-        return collision;
+        return guid;
     });
     //! node_modules/hbjs/src/utils/ajax/http.js
     define("http", [ "extend" ], function(extend) {

@@ -7,7 +7,7 @@ internal('cell', ['getAngle','getPointOnCircle'], function (getAngle, getPointOn
         this.speed = speed || 0;
         this.color = color || 'green';
         this.lastPoint = {x:x, y:y};
-        this.status = 'alive';
+        this.alive = true;
         this.score = 0;
     }
 
@@ -23,7 +23,7 @@ internal('cell', ['getAngle','getPointOnCircle'], function (getAngle, getPointOn
             var area = this.area() + c.area();
             var r2 = area / Math.PI;
             this.radius = Math.sqrt(r2);
-            c.status = 'dead';
+            c.alive = false;
             this.score += ca;
         },
         update: function() {
